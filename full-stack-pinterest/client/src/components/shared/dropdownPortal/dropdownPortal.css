@@ -1,0 +1,17 @@
+.dropdownMenu {
+    background: white;
+    color: #000;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .dropdownMenu div {
+    padding: 10px 16px;
+    cursor: pointer;
+  }
+  
+  .dropdownMenu div:hover {
+    background-color: #f0f0f0;
+  }
+  

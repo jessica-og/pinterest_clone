@@ -1,0 +1,113 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+
+
+
+/* Global styles for the toast */
+.Toastify__progress-bar {
+  background-color: #eb0729 !important;
+}
+.Toastify__progress-bar--success {
+  background-color: #eb0729 !important;
+}
+.Toastify__progress-bar--info {
+  background-color: #309ed9 !important;
+}
+.Toastify__progress-bar--error {
+  background-color: #e3332d !important;
+}
+.Toastify__progress-bar--warning {
+  background-color: #edbd0e !important;
+}
+
+.Toastify__close-button {
+  color: #eb0729 !important;
+}
+.Toastify__close-button--default {
+  color: #eb0729 !important;
+}
+.Toastify__close-button > svg {
+  color: #eb0729 !important;
+}
+.Toastify__close-button:hover {
+  color: #eb0729 !important;
+}
+.Toastify__close-button:focus {
+  color: #eb0729 !important;
+}
+
+
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 16px;
+    padding: 16px;
+  grid-auto-rows: 10px;
+}
+
+@media (max-width: 1746px) {
+  .gallery {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+@media (max-width: 1509px) {
+  .gallery {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+@media (max-width: 1272px) {
+  .gallery {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 1035px) {
+  .gallery {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 798px) {
+  .gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 475px) {
+  .gallery {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+
+
+.collectionInfo {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.collectionInfo h1 {
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #333;
+}
+
+.collectionInfo span {
+  font-size: 13px;
+  color: #888;
+}
