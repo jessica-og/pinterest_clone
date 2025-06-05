@@ -34,6 +34,7 @@ export const getPins = async (req, res) => {
   try {
     const pins = await Pin.find(filter)
       .populate("user", "_id username img displayName") // <-- this line ensures user info is included
+      .sort({ createdAt: -1 }) 
       .limit(LIMIT)
       .skip(pageNumber * LIMIT);
 
@@ -157,13 +158,35 @@ export const createPin = async (req, res) => {
   if (!title || !description || !media) {
     return res.status(400).json({ message: "All FileIds are required!" });
   }
-  
 
-  
   const parsedTextOptions = JSON.parse(textOptions || "{}");
   const parsedCanvasOptions = JSON.parse(canvasOptions || "{}");
 
-  const metadata = await sharp(media.data).metadata();
+  // Step 1: Get original metadata
+  const originalMetadata = await sharp(media.data).metadata();
+
+  // Step 2: Resize the image if it's too large
+  const MAX_WIDTH = 1024;
+  const MAX_HEIGHT = 1024;
+
+  let resizedBuffer = media.data;
+
+  if (
+    originalMetadata.width > MAX_WIDTH ||
+    originalMetadata.height > MAX_HEIGHT
+  ) {
+    resizedBuffer = await sharp(media.data)
+      .resize({
+        width: MAX_WIDTH,
+        height: MAX_HEIGHT,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .toBuffer();
+  }
+
+  // Step 3: Get resized metadata
+  const metadata = await sharp(resizedBuffer).metadata();
 
   const originalOrientation =
     metadata.width < metadata.height ? "portrait" : "landscape";
@@ -190,7 +213,8 @@ export const createPin = async (req, res) => {
     width = metadata.width;
     height = metadata.height;
   }
-  
+
+  // Step 4: ImageKit init
   const imagekit = new Imagekit({
     publicKey: process.env.IK_PUBLIC_KEY,
     privateKey: process.env.IK_PRIVATE_KEY,
@@ -202,8 +226,7 @@ export const createPin = async (req, res) => {
     (parsedTextOptions.top * height) / parsedCanvasOptions.height
   );
 
-  // FIXED TRANSFORMATION STRING
-
+  // Step 5: Build transformation string
   let croppingStrategy = "";
 
   if (parsedCanvasOptions.size !== "original") {
@@ -231,64 +254,61 @@ export const createPin = async (req, res) => {
       : ""
   }`;
 
+  // Step 6: Upload to ImageKit
   imagekit
-  .upload({
-    file: media.data,
-    fileName: media.name,
-    folder: "test",
-    transformation: {
-      pre: transformationString,
-    },
-  })
-  .then(async (response) => {
-    // FIXED: ADD NEW BOARD
-    let newBoardId;
+    .upload({
+      file: resizedBuffer,
+      fileName: media.name,
+      folder: "test",
+      transformation: {
+        pre: transformationString,
+      },
+    })
+    .then(async (response) => {
+      let newBoardId;
 
-    if (newBoard) {
-      const res = await Board.create({
-        title: newBoard,
+      if (newBoard) {
+        const res = await Board.create({
+          title: newBoard,
+          user: req.userId,
+          createdForPin: null,
+        });
+        newBoardId = res._id;
+      }
+
+      const newPin = await Pin.create({
         user: req.userId,
-        createdForPin: null,
+        title,
+        description,
+        link: link || null,
+        board: newBoardId || board || null,
+        tags: Array.isArray(tags)
+          ? tags
+          : typeof tags === "string"
+          ? tags.split(",").map((tag) => tag.trim())
+          : [],
+        media: response.filePath,
+        imageKitFileId: response.fileId,
+        width: response.width,
+        height: response.height,
       });
-      newBoardId = res._id;  
-    }
 
-    const newPin = await Pin.create({
-      user: req.userId,
-      title,
-      description,
-      link: link || null,
-      board: newBoardId || board || null,
-      tags: Array.isArray(tags)
-      ? tags
-      : typeof tags === "string"
-        ? tags.split(",").map((tag) => tag.trim())
-        : [],
-    
-      media: response.filePath,
-    imageKitFileId: response.fileId,
-      width: response.width,
-      height: response.height,
+      if (newBoardId) {
+        await Board.findByIdAndUpdate(newBoardId, {
+          createdForPin: newPin._id,
+        });
+      }
+
+      console.log("Created Pin:", newPin);
+      console.log("Deleting file with FileId:", response.fileId);
+
+      return res.status(201).json(newPin);
+    })
+    .catch((err) => {
+      console.log(err);
+      return res.status(500).json(err);
     });
-
-    // Update board with reference to created pin
-    await Board.findByIdAndUpdate(newBoardId, {
-      createdForPin: newPin._id,
-    });
-
-    // Log the newly created pin and FileId for deletion
-    console.log("Created Pin:", newPin);
-    console.log("Deleting file with FileId:", response.fileId);
-
-    // Send response only after everything is done
-    return res.status(201).json(newPin);
-  })
-  .catch((err) => {
-    console.log(err);
-    return res.status(500).json(err);
-  });
 };
-
 
 
 export const updatePin = async (req, res) => {
@@ -316,62 +336,76 @@ export const updatePin = async (req, res) => {
       removeExistingImage,
     } = req.body;
 
-    // Validate and handle the board FileId
     let boardId = board === "" ? null : board;
-
     let mediaPath = pin.media;
     let width = pin.width;
     let height = pin.height;
-    let fileId = pin.imageKitFileId; // ✅ Declare fileId properly
+    let fileId = pin.imageKitFileId;
 
-    // 1. If user removed previous image
+    // 1. Remove old image if requested
     if (removeExistingImage === "true" && pin.media) {
       try {
         const fullImageUrl = `${process.env.IK_URL_ENDPOINT}${pin.media}`;
         await imagekit.purgeCache(fullImageUrl);
-        console.log(`Cache invalidated for: ${fullImageUrl}`);
-
         if (fileId) {
           await imagekit.deleteFile(fileId);
           mediaPath = "";
           width = 0;
           height = 0;
           fileId = null;
-        } else {
-          console.log("No fileId available for deletion");
         }
       } catch (err) {
-        console.error("Failed to delete image from ImageKit or invalidate cache:", err);
+        console.error("Error deleting old image:", err);
       }
     }
 
-    // 2. If user uploaded a new file (if media exists)
+    // 2. Upload new image if provided
     const media = req.files?.media;
     if (media) {
       try {
         const oldFileId = pin.imageKitFileId;
         const oldFullUrl = `${process.env.IK_URL_ENDPOINT}${pin.media}`;
-
         if (oldFileId) {
           try {
             await imagekit.purgeCache(oldFullUrl);
             await imagekit.deleteFile(oldFileId);
-            console.log(`Deleted old image: ${oldFullUrl}`);
           } catch (err) {
             console.error("Failed to delete old image:", err);
           }
         }
 
-       const parsedTextOptions = JSON.parse(textOptions || "{}");
-      
+        const parsedTextOptions = JSON.parse(textOptions || "{}");
         const parsedCanvasOptions = JSON.parse(canvasOptions || "{}");
 
-        const metadata = await sharp(media.data).metadata();
+        // Step 1: Resize image if necessary
+        const MAX_WIDTH = 1024;
+        const MAX_HEIGHT = 1024;
+        const originalMetadata = await sharp(media.data).metadata();
+
+        let resizedBuffer = media.data;
+        if (
+          originalMetadata.width > MAX_WIDTH ||
+          originalMetadata.height > MAX_HEIGHT
+        ) {
+          resizedBuffer = await sharp(media.data)
+            .resize({
+              width: MAX_WIDTH,
+              height: MAX_HEIGHT,
+              fit: "inside",
+              withoutEnlargement: true,
+            })
+            .toBuffer();
+        }
+
+        const metadata = await sharp(resizedBuffer).metadata();
         const originalAspectRatio = metadata.width / metadata.height;
+        const originalOrientation =
+          metadata.width < metadata.height ? "portrait" : "landscape";
 
         const clientAspectRatio =
           parsedCanvasOptions.size !== "original"
-            ? parsedCanvasOptions.size.split(":")[0] / parsedCanvasOptions.size.split(":")[1]
+            ? parsedCanvasOptions.size.split(":")[0] /
+              parsedCanvasOptions.size.split(":")[1]
             : originalAspectRatio;
 
         width = metadata.width;
@@ -380,45 +414,40 @@ export const updatePin = async (req, res) => {
             ? metadata.width / clientAspectRatio
             : metadata.height;
 
-            const textLeftPosition = Math.round((parsedTextOptions.left * width) / 375);
-            const textTopPosition = Math.round(
-              (parsedTextOptions.top * height) / parsedCanvasOptions.height
-            );
-          
-          
-          let croppingStrategy = "";
-          
-          if (parsedCanvasOptions.size !== "original") {
-            const originalOrientation =
-              metadata.width < metadata.height ? "portrait" : "landscape";
-          
-            const parsedOrientation = parsedCanvasOptions.orientation || originalOrientation;
-          
-            if (originalAspectRatio > clientAspectRatio) {
-              croppingStrategy = ",cm-pad_resize";
-            } else if (
-              originalOrientation === "landscape" &&
-              parsedOrientation === "portrait"
-            ) {
-              croppingStrategy = ",cm-pad_resize";
-            }
+        const textLeftPosition = Math.round((parsedTextOptions.left * width) / 375);
+        const textTopPosition = Math.round(
+          (parsedTextOptions.top * height) / parsedCanvasOptions.height
+        );
+
+        let croppingStrategy = "";
+
+        if (parsedCanvasOptions.size !== "original") {
+          const parsedOrientation = parsedCanvasOptions.orientation || originalOrientation;
+
+          if (originalAspectRatio > clientAspectRatio) {
+            croppingStrategy = ",cm-pad_resize";
+          } else if (
+            originalOrientation === "landscape" &&
+            parsedOrientation === "portrait"
+          ) {
+            croppingStrategy = ",cm-pad_resize";
           }
-          
-          const transformationString = `w-${width},h-${height}${croppingStrategy},bg-${parsedCanvasOptions.backgroundColor.substring(
-            1
-          )}${
-            parsedTextOptions.text
-              ? `,l-text,i-${parsedTextOptions.text},fs-${
-                  parsedTextOptions.fontSize * 2.1
-                },lx-${textLeftPosition},ly-${textTopPosition},co-${parsedTextOptions.color.substring(
-                  1
-                )},l-end`
-              : ""
-          }`;
-        
+        }
+
+        const transformationString = `w-${width},h-${height}${croppingStrategy},bg-${parsedCanvasOptions.backgroundColor.substring(
+          1
+        )}${
+          parsedTextOptions.text
+            ? `,l-text,i-${parsedTextOptions.text},fs-${
+                parsedTextOptions.fontSize * 2.1
+              },lx-${textLeftPosition},ly-${textTopPosition},co-${parsedTextOptions.color.substring(
+                1
+              )},l-end`
+            : ""
+        }`;
 
         const uploadRes = await imagekit.upload({
-          file: media.data,
+          file: resizedBuffer,
           fileName: media.name,
           folder: "test",
           transformation: { pre: transformationString },
@@ -427,23 +456,17 @@ export const updatePin = async (req, res) => {
         mediaPath = uploadRes.filePath;
         width = uploadRes.width;
         height = uploadRes.height;
-        fileId = uploadRes.fileId; // ✅ Store new fileId
-
-        console.log(`New image uploaded, path: ${mediaPath}`);
+        fileId = uploadRes.fileId;
 
         await Pin.findByIdAndUpdate(req.params.id, {
           $set: { imageKitFileId: fileId },
         });
-
-        if (!fileId) {
-          console.warn("Warning: New image uploaded but fileId is missing!");
-        }
       } catch (err) {
-        console.error("Failed to upload new image to ImageKit:", err);
+        console.error("Failed to upload new image:", err);
       }
     }
 
-    // 3. Update the pin with the new details
+    // 3. Update pin
     const updatedPin = await Pin.findByIdAndUpdate(
       req.params.id,
       {
@@ -453,11 +476,10 @@ export const updatePin = async (req, res) => {
           link,
           board: boardId,
           tags: Array.isArray(tags)
-          ? tags
-          : typeof tags === "string"
+            ? tags
+            : typeof tags === "string"
             ? tags.split(",").map((tag) => tag.trim())
             : [],
-        
           media: mediaPath,
           width,
           height,
@@ -466,16 +488,13 @@ export const updatePin = async (req, res) => {
       { new: true }
     );
 
-    console.log("Final fileId used:", fileId);
-    console.log("Created Pin:", updatedPin);
-
+    console.log("Updated pin with fileId:", fileId);
     res.status(200).json(updatedPin);
   } catch (err) {
-    console.log("Error updating pin:", err);
+    console.error("Error updating pin:", err);
     res.status(500).json({ message: err.message || "Something went wrong." });
   }
 };
-
 
 
 

@@ -33,7 +33,12 @@ const useEditorStore = create((set) => ({
         left: 0,
       },
     }),
-  setCanvasOptions: (newOption) => set({ canvasOptions: newOption }),
+    setCanvasOptions: (updater) =>
+      set((state) => ({
+          canvasOptions:
+          typeof updater === "function" ? updater(state.canvasOptions) : updater,
+      })),
+  //setCanvasOptions: (newOption) => set({ canvasOptions: newOption }),
   // FIXED: ADD RESET FUNCTION
   resetStore: () =>
     set({
@@ -51,7 +56,7 @@ const useEditorStore = create((set) => ({
         size: "original",
         backgroundColor: "#008080",
       },
-    }),
+    }),  
 }));
 
 export default useEditorStore;

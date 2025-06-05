@@ -65,7 +65,7 @@ const CreatePage = () => {
         <div className="createBottom">
           <div className="createBottom">
             {previewImg.url && previewImg.width && previewImg.height ? (
-              <div className="preview">
+              <div className="preview" >
                 <img src={previewImg.url} alt="" />
              {!isEditMode && (
                  <div className="editIcon" 
@@ -73,7 +73,7 @@ const CreatePage = () => {
                   if (originalImg) {
                      setPreviewImg(originalImg);
                   }
-                  setIsDesigning(true);
+                  setIsDesigning(true);  
                 }}
              // onClick={() => setIsDesigning(true)}
               >

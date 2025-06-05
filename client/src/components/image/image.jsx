@@ -7,11 +7,13 @@ const Image = React.forwardRef(({ path, alt = "", className = "", w, h, variant,
   const wrapperStyles = variant === "icon" ? {
     width: `${w}px` ,
     height:  `${h}px`,
+    maxHeight: `${h}px`,
     overflow: "hidden",
-    display: "flex",  
+    display: "block",  
   } : {
     width: '100%',
     height: '100%',
+ //   maxHeight: `${h}px`,
     overflow: "hidden",
     display: "flex",
   };
@@ -20,7 +22,7 @@ const Image = React.forwardRef(({ path, alt = "", className = "", w, h, variant,
     objectFit: "cover",
     display: "block",
     width: "100%",
-    height: "auto", 
+
   };
 
   if (isExternal) {
@@ -42,7 +44,7 @@ const Image = React.forwardRef(({ path, alt = "", className = "", w, h, variant,
       <IKImage
         urlEndpoint={import.meta.env.VITE_URL_IK_ENDPOINT}
         path={path}
-        transformation={[
+        transformation={[  
           {
             height: h,
             width: w,

@@ -45,7 +45,8 @@ const Layers = ({setIsDesigning}) => {
         className={`layer ${selectedLayer === "canvas" ? "selected" : ""}`}
       >
         <div
-          className="layerImage"
+         onClick={() => handleSelectedLayer("canvas")}
+          className={`layerImage ${selectedLayer === "canvas" ? "selected" : ""}`}
           style={{ backgroundColor: canvasOptions.backgroundColor }}
         ></div>
         <span>Canvas</span>

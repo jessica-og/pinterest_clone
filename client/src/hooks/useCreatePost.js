@@ -7,7 +7,7 @@ import apiRequest from "../utils/apiRequest";
 import useEditorStore from "../utils/editorStore";
 import useAuthStore from "../utils/authStore";
 
-const addPost = async (post) => {
+const addPost = async (post) => {  
   const res = await apiRequest.post("/pins", post);
   return res.data;
 };
@@ -115,7 +115,8 @@ export const useCreatePost = () => {
       setPreviewImg({
          url: imgDataUrl, 
          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight
+          height: containerRef.current.offsetHeight,
+         
          });
 
       //  setPreviewImg({ url: imgDataUrl, width: 375, height: canvasOptions.height }); 

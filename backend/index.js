@@ -10,7 +10,7 @@ import saveRouter from "./routes/save.route.js";
 import connectDB from "./utils/connectDB.js"; 
 import cookieParser from "cookie-parser";
 import fileUpload from "express-fileupload";
-  
+    
 const app = express();
 
 app.use(express.json());
