@@ -21,11 +21,14 @@ export const registerUser = async (req, res) => {
 
   const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET);
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-  });
+ res.cookie("token", token, {
+  httpOnly: true,
+  secure: true,        // must be true for cross-site cookies
+  sameSite: "none",    // REQUIRED for cross-origin cookies
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+});
+
+
 
   const { hashedPassword, ...detailsWithoutPassword } = user.toObject();
 
@@ -52,11 +55,14 @@ export const loginUser = async (req, res) => {
 
   const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET);
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-  });
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: true,        // must be true for cross-site cookies
+  sameSite: "none",    // REQUIRED for cross-origin cookies
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+});
+
+
 
   const { hashedPassword, ...detailsWithoutPassword } = user.toObject();
 
@@ -64,7 +70,12 @@ export const loginUser = async (req, res) => {
 };
 
 export const logoutUser = async (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+});
+
 
   res.status(200).json({ message: "Logout successful" });
 };
