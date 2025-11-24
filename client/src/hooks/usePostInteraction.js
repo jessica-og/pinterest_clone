@@ -15,7 +15,7 @@ export const usePostInteraction = (postId) => {
       },
     });
   
-    const interactionMutation = useMutation({
+    const interactionMutation = useMutation({  
       mutationFn: ({ id, type }) =>
         apiRequest.post(`/pins/interact/${id}`, { type }).then((res) => res.data),
       onSuccess: (_, variables) => {

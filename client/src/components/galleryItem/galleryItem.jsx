@@ -71,7 +71,7 @@ const GalleryItem = ({ item,
           isPending={interactionMutation.isPending}
           onClick={() => interactionMutation.mutate({ id: item._id, type: "save" })}
         />
-      )}
+      )}  
 
       {showOverlayIcons && (
         <OverlayIcons
